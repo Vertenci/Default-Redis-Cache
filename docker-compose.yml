@@ -12,8 +12,51 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - .:/app
+    networks:
+      - app_network
+
+  celery_worker:
+    build: .
+    container_name: default_redis_cache_worker
+    command:
+      - celery
+      - -A
+      - src.infrastructure.tasks.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=20
+      - --pool=threads
+      - -Q
+      - default,cars
+    env_file:
+      - .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: default_redis_cache_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - app_network
 
@@ -32,7 +75,7 @@ services:
     container_name: default_redis_cache_redis_ui
     restart: always
     environment:
-      - REDIS_HOSTS=local:redis:6379
+        - REDIS_HOSTS=local:redis:6379:0:cars_cache,celery_results:redis:6379:1:celery_tasks
     ports:
       - "8081:8081"
     networks:

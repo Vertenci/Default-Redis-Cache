@@ -5,7 +5,9 @@ from starlette import status
 
 from src.application.dtos.car_dto import CreateCarDTO, UpdateCarDTO
 from src.application.services.car_service import CarService
+from src.domain.interfaces.task_queue import TaskQueueInterface
 from src.interfaces.api.dependencies.services import get_car_service
+from src.interfaces.api.dependencies.tasks import get_task_queue
 from src.interfaces.api.schemas.car_schemas import (
     CarResponseSchema,
     CarCreateSchema,
@@ -107,3 +109,14 @@ async def delete_car(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Car with id {car_id} not found"
         )
+
+
+@router.get("/tasks/{task_id}/status")
+async def get_task_status(
+    task_id: str,
+    task_queue: TaskQueueInterface = Depends(get_task_queue),
+):
+    result = await task_queue.get_result(task_id)
+    if result is None:
+        return {"task_id": task_id, "status": "processing"}
+    return {"task_id": task_id, "status": "completed", "result": result}

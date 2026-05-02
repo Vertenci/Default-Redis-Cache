@@ -5,6 +5,7 @@ from datetime import datetime
 from src.application.dtos.car_dto import CreateCarDTO, CarResponseDTO, UpdateCarDTO
 from src.domain.entities.car import Car
 from src.domain.interfaces.cache import CacheInterface
+from src.domain.interfaces.task_queue import TaskQueueInterface
 from src.domain.repositories.car_repository import CarRepository
 
 
@@ -13,9 +14,10 @@ class CarService:
     CACHE_KEY_LIST = "cars"
     CACHE_TTL = 300
 
-    def __init__(self, car_repository: CarRepository, cache: CacheInterface | None = None):
+    def __init__(self, car_repository: CarRepository, cache: CacheInterface | None = None, task_queue: TaskQueueInterface | None = None):
         self._car_repository = car_repository
         self._cache = cache
+        self._task_queue  = task_queue
 
     def _cache_key(self, car_id: uuid.UUID) -> str:
         return f"{self.CACHE_KEY_PREFIX}:{car_id}"
@@ -56,6 +58,15 @@ class CarService:
         )
         saved_car = await self._car_repository.save(car)
         response = CarResponseDTO.from_entity(saved_car)
+
+        if self._task_queue:
+            task_id = await self._task_queue.send_task(
+                "car_tasks.send_car_created_notification",
+                car_id=str(saved_car.id),
+                brand=saved_car.brand,
+                model=saved_car.model,
+                email="admin@example.com",
+            )
 
         if self._cache:
             await self._cache.delete_pattern(f"{self.CACHE_KEY_LIST}:*")
