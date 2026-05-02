@@ -1,0 +1,67 @@
+services:
+  web:
+    build: .
+    container_name: default_redis_cache
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: default_redis_cache_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+
+  redis-ui:
+    image: rediscommander/redis-commander
+    container_name: default_redis_cache_redis_ui
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - app_network
+
+  db:
+    image: postgres:16
+    container_name: default_redis_cache_db
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+    name: default_redis_cache_postgres_data
+  redis_data:
+    name: default_redis_cache_redis_data
+
+networks:
+  app_network:
+    driver: bridge
