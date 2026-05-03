@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from src.infrastructure.cache.redis_client import redis_client
 from src.infrastructure.database.database import db_manager
+from src.interfaces.api.middleware import TimingMiddleware
 from src.interfaces.api.routes.cars_router import router as car_router
 
 
@@ -16,6 +17,8 @@ async def lifespan(app: FastAPI):
     await db_manager.close()
 
 app = FastAPI(title="Default Redis Cache", lifespan=lifespan)
+
+app.add_middleware(TimingMiddleware)
 
 app.include_router(car_router)
 

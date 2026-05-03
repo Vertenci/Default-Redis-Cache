@@ -40,7 +40,7 @@ celery_app.conf.update(
         },
     },
     task_reject_on_worker_lost=True,
-    imports=("src.infrastructure.tasks.car_tasks",),
+    # imports=("src.infrastructure.tasks.car_tasks",),
 )
 
 celery_app.autodiscover_tasks([
