@@ -18,3 +18,23 @@ class CacheInterface(ABC):
     @abstractmethod
     async def delete_pattern(self, pattern: str) -> int:
         pass
+
+    @abstractmethod
+    async def increment(self, key: str, amount: int = 1) -> int:
+        pass
+
+    @abstractmethod
+    async def get_keys_by_pattern(self, pattern: str) -> list[str]:
+        pass
+
+    @abstractmethod
+    async def lpush(self, key: str, *values: str) -> int:
+        pass
+
+    @abstractmethod
+    async def ltrim(self, key: str, start: int, end: int) -> bool:
+        pass
+
+    @abstractmethod
+    async def lrange(self, key: str, start: int, end: int) -> list:
+        pass

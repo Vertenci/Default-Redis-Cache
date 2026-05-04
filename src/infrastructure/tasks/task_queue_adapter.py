@@ -1,11 +1,12 @@
 from typing import Any
 from celery.result import AsyncResult
 
+from src.infrastructure.tasks.celery_app import celery_app
 from src.domain.interfaces.task_queue import TaskQueueInterface
 
 
 class CeleryTaskQueue(TaskQueueInterface):
-    def __init__(self, celery_app):
+    def __init__(self):
         self._celery_app = celery_app
 
     async def send_task(self, task_name: str, *args, **kwargs) -> str:

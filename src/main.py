@@ -1,18 +1,29 @@
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 
 from src.infrastructure.cache.redis_client import redis_client
 from src.infrastructure.database.database import db_manager
+from src.infrastructure.messaging.event_handlers import setup_event_handlers
+from src.infrastructure.messaging.kafka_consumer_client import kafka_consumer_client
+from src.infrastructure.messaging.kafka_producer_client import kafka_producer_client
 from src.interfaces.api.middleware import TimingMiddleware
 from src.interfaces.api.routes.cars_router import router as car_router
+from src.interfaces.api.routes.statistics_router import router as statistics_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db_manager.initialize()
     await redis_client.initialize()
+    await kafka_producer_client.initialize()
+    await kafka_consumer_client.initialize()
+    await setup_event_handlers()
+    await kafka_consumer_client.start_consuming()
+
     yield
+
+    await kafka_producer_client.close()
+    await kafka_consumer_client.close()
     await redis_client.close()
     await db_manager.close()
 
@@ -21,6 +32,7 @@ app = FastAPI(title="Default Redis Cache", lifespan=lifespan)
 app.add_middleware(TimingMiddleware)
 
 app.include_router(car_router)
+app.include_router(statistics_router)
 
 @app.get("/health")
 async def health():

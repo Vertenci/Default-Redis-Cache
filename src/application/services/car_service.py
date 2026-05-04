@@ -3,8 +3,10 @@ import uuid
 from datetime import datetime
 
 from src.application.dtos.car_dto import CreateCarDTO, CarResponseDTO, UpdateCarDTO
+from src.application.dtos.event_dto import EventType, CarEventDTO
 from src.domain.entities.car import Car
 from src.domain.interfaces.cache import CacheInterface
+from src.domain.interfaces.event_publisher import EventPublisherInterface
 from src.domain.interfaces.task_queue import TaskQueueInterface
 from src.domain.repositories.car_repository import CarRepository
 
@@ -14,10 +16,16 @@ class CarService:
     CACHE_KEY_LIST = "cars"
     CACHE_TTL = 300
 
-    def __init__(self, car_repository: CarRepository, cache: CacheInterface | None = None, task_queue: TaskQueueInterface | None = None):
+    def __init__(self,
+                 car_repository: CarRepository,
+                 cache: CacheInterface | None = None,
+                 task_queue: TaskQueueInterface | None = None,
+                 event_publisher: EventPublisherInterface | None = None
+                 ):
         self._car_repository = car_repository
         self._cache = cache
         self._task_queue  = task_queue
+        self._event_publisher = event_publisher
 
     def _cache_key(self, car_id: uuid.UUID) -> str:
         return f"{self.CACHE_KEY_PREFIX}:{car_id}"
@@ -49,6 +57,32 @@ class CarService:
             updated_at=datetime.fromisoformat(data["updated_at"]),
         )
 
+    @staticmethod
+    def _car_to_event_data(car: Car) -> dict:
+        return {
+            "brand": car.brand,
+            "model": car.model,
+            "year": car.year,
+            "price": car.price,
+        }
+
+    async def _publish_event(self, event_type: EventType, car: Car) -> None:
+        if not self._event_publisher:
+            return
+
+        event = CarEventDTO(
+            event_id=uuid.uuid4(),
+            event_type=event_type,
+            car_id=car.id,
+            timestamp=datetime.now(),
+            data=self._car_to_event_data(car),
+        )
+        await self._event_publisher.publish(
+            topic="car.events",
+            key=str(car.id),
+            value=event.to_dict(),
+        )
+
     async def create_car(self, create_dto: CreateCarDTO) -> CarResponseDTO:
         car = Car.create(
             brand=create_dto.brand,
@@ -58,6 +92,8 @@ class CarService:
         )
         saved_car = await self._car_repository.save(car)
         response = CarResponseDTO.from_entity(saved_car)
+
+        await self._publish_event(EventType.CAR_CREATED, saved_car)
 
         if self._task_queue:
             task_id = await self._task_queue.send_task(
@@ -130,6 +166,8 @@ class CarService:
         updated_car = await self._car_repository.save(car)
         response = CarResponseDTO.from_entity(updated_car)
 
+        await self._publish_event(EventType.CAR_UPDATED, updated_car)
+
         if self._cache:
             await self._cache.set(
                 self._cache_key(car_id),
@@ -141,7 +179,12 @@ class CarService:
         return response
 
     async def delete_car(self, car_id: uuid.UUID) -> bool:
+        car = await self._car_repository.get_by_id(car_id)
         deleted = await self._car_repository.delete(car_id)
+
+        if deleted and car:
+            await self._publish_event(EventType.CAR_DELETED, car)
+
         if deleted and self._cache:
             await self._cache.delete(self._cache_key(car_id))
             await self._cache.delete_pattern(f"{self.CACHE_KEY_LIST}:*")

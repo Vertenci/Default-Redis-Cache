@@ -15,6 +15,15 @@ class Car:
 
     @classmethod
     def create(cls, brand: str, model: str, year: int, price: int) -> "Car":
+        if not brand.strip():
+            raise ValueError("Brand cannot be empty")
+        if not model.strip():
+            raise ValueError("Model cannot be empty")
+        if year < 1886:
+            raise ValueError("Invalid year")
+        if price <= 0:
+            raise ValueError("Price must be positive")
+
         return cls(
             id=None,
             brand=brand,

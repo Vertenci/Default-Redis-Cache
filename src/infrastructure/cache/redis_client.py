@@ -66,11 +66,28 @@ class RedisClient:
         except Exception as e:
             return 0
 
-    async def exists(self, key: str) -> bool:
-        try:
-            return await self._redis.exists(key) > 0
-        except Exception as e:
-            raise False
+    async def incrby(self, key: str, amount: int = 1) -> int:
+        return await self._redis.incrby(key, amount)
+
+    async def keys(self, pattern: str) -> list[str]:
+        return await self._redis.keys(pattern)
+
+    async def lpush(self, key: str, *values: str) -> int:
+        return await self._redis.lpush(key, *values)
+
+    async def ltrim(self, key: str, start: int, end: int) -> bool:
+        await self._redis.ltrim(key, start, end)
+        return True
+
+    async def lrange(self, key: str, start: int, end: int) -> list:
+        values = await self._redis.lrange(key, start, end)
+        result = []
+        for v in values:
+            try:
+                result.append(json.loads(v))
+            except (json.JSONDecodeError, TypeError):
+                result.append(v)
+        return result
 
 
 redis_client = RedisClient()

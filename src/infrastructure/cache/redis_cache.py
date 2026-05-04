@@ -19,3 +19,18 @@ class RedisCache(CacheInterface):
 
     async def delete_pattern(self, pattern: str) -> int:
         return await self._redis.delete_pattern(pattern)
+
+    async def increment(self, key: str, amount: int = 1) -> int:
+        return await self._redis.incrby(key, amount)
+
+    async def get_keys_by_pattern(self, pattern: str) -> list[str]:
+        return await self._redis.keys(pattern)
+
+    async def lpush(self, key: str, *values: str) -> int:
+        return await self._redis.lpush(key, *values)
+
+    async def ltrim(self, key: str, start: int, end: int) -> bool:
+        return await self._redis.ltrim(key, start, end)
+
+    async def lrange(self, key: str, start: int, end: int) -> list:
+        return await self._redis.lrange(key, start, end)
